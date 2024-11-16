@@ -7,14 +7,6 @@ import (
 	"time"
 )
 
-type Scheduler struct {
-	handler   *EndpointHandler
-	interval  time.Duration
-	endpoints []EndpointRequest
-	done      chan struct{}
-	wg        sync.WaitGroup
-}
-
 func NewScheduler(handler *EndpointHandler, interval time.Duration, endpoints []EndpointRequest) *Scheduler {
 	return &Scheduler{
 		handler:   handler,

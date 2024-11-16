@@ -8,37 +8,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-type API struct {
-	handler *EndpointHandler
-	router  *mux.Router
-}
-
-type EndpointListResponse struct {
-	URLs []string `json:"urls"`
-}
-
-type HistoryResponse struct {
-	URL     string         `json:"url"`
-	History []HistoryEntry `json:"history"`
-	Stats   EndpointStats  `json:"stats"`
-}
-
-type HistoryEntry struct {
-	Status    int           `json:"status"`
-	Expected  int           `json:"expected"`
-	Error     string        `json:"error,omitempty"`
-	Timestamp time.Time     `json:"timestamp"`
-	Duration  time.Duration `json:"duration"`
-}
-
-type EndpointStats struct {
-	TotalChecks      int     `json:"total_checks"`
-	SuccessfulChecks int     `json:"successful_checks"`
-	UpTimePercentage float64 `json:"uptime_percentage"`
-	AverageResponse  int64   `json:"average_response_ms"`
-	LastCheck        string  `json:"last_check"`
-}
-
 func NewAPI(handler *EndpointHandler) *API {
 	api := &API{
 		handler: handler,

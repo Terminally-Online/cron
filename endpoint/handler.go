@@ -12,45 +12,6 @@ import (
 	"go.etcd.io/bbolt"
 )
 
-type StoredResponse struct {
-	URL       string
-	Method    string
-	Status    int
-	Expected  int
-	Error     string
-	Timestamp time.Time
-	Duration  time.Duration
-}
-
-type RetryConfig struct {
-	Attempts int
-	Delay    time.Duration
-	Timeout  time.Duration
-}
-
-type EndpointRequest struct {
-	URL           string
-	Method        string
-	Timeout       time.Duration
-	Status        int
-	RetryAttempts int
-	RetryDelay    time.Duration
-}
-
-type EndpointResponse struct {
-	Endpoint  EndpointRequest
-	Status    int
-	Error     error
-	Timestamp time.Time
-	Duration  time.Duration
-}
-
-type EndpointHandler struct {
-	client   *http.Client
-	db       *bbolt.DB
-	histSize int
-}
-
 const endpointBucket = "endpoints"
 
 func NewEndpointHandler(dbPath string, histSize int) (*EndpointHandler, error) {
@@ -187,7 +148,6 @@ func (h *EndpointHandler) createTimeoutResponse(req EndpointRequest, attempt int
 
 	return response
 }
-
 
 func (h *EndpointHandler) getRetryConfig(req EndpointRequest) RetryConfig {
 	return RetryConfig{
