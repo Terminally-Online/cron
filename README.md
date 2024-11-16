@@ -1,4 +1,4 @@
-# Go Health Check Service
+# Cron Service
 
 A lightweight and robust health checking service written in Go that monitors endpoint availability and provides historical uptime data.
 
