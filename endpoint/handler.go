@@ -85,7 +85,7 @@ func (h *EndpointHandler) GetEndpointHistory(url string) ([]EndpointResponse, er
 			return nil
 		}
 
-		var stored []StoredResponse
+		var stored []EndpointResponseStored
 		if err := json.Unmarshal(data, &stored); err != nil {
 			return fmt.Errorf("failed to unmarshal responses: %w", err)
 		}
@@ -203,7 +203,7 @@ func (h *EndpointHandler) performRequest(ctx context.Context, endpointRequest En
 }
 
 func (h *EndpointHandler) storeResponse(response EndpointResponse) error {
-	stored := StoredResponse{
+	stored := EndpointResponseStored{
 		URL:       response.Endpoint.URL,
 		Method:    response.Endpoint.Method,
 		Status:    response.Status,
@@ -218,7 +218,7 @@ func (h *EndpointHandler) storeResponse(response EndpointResponse) error {
 	return h.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(endpointBucket))
 
-		var responses []StoredResponse
+		var responses []EndpointResponseStored
 		data := b.Get([]byte(response.Endpoint.URL))
 		if data != nil {
 			if err := json.Unmarshal(data, &responses); err != nil {

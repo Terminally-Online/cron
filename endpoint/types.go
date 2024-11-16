@@ -44,7 +44,7 @@ type EndpointStats struct {
 	LastCheck        string  `json:"last_check"`
 }
 
-type StoredResponse struct {
+type EndpointResponseStored struct {
 	URL       string
 	Method    string
 	Status    int
