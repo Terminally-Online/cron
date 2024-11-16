@@ -16,7 +16,7 @@ A lightweight and robust health checking service written in Go that monitors end
 
 ```bash
 # Clone the repository
-git clone https://terminally-online/cron
+git clone https://github.com/Terminally-Online/cron
 
 # Install dependencies
 go mod download
