@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+	"terminally-online/cron/utils"
 	"time"
 
 	"go.etcd.io/bbolt"
@@ -20,11 +22,19 @@ type StoredResponse struct {
 	Duration  time.Duration
 }
 
+type RetryConfig struct {
+	Attempts int
+	Delay    time.Duration
+	Timeout  time.Duration
+}
+
 type EndpointRequest struct {
-	URL     string
-	Method  string
-	Timeout time.Duration
-	Status  int
+	URL           string
+	Method        string
+	Timeout       time.Duration
+	Status        int
+	RetryAttempts int
+	RetryDelay    time.Duration
 }
 
 type EndpointResponse struct {
@@ -76,94 +86,32 @@ func (h *EndpointHandler) Close() error {
 }
 
 func (h *EndpointHandler) Handle(ctx context.Context, endpointRequest EndpointRequest) EndpointResponse {
-	response := h.performRequest(ctx, endpointRequest)
-	if err := h.storeResponse(response); err != nil {
-
-		fmt.Printf("failed to store response: %v\n", err)
-	}
-	return response
-}
-
-func (h *EndpointHandler) performRequest(ctx context.Context, endpointRequest EndpointRequest) EndpointResponse {
-	start := time.Now()
-	endpointResponse := EndpointResponse{
-		Endpoint:  endpointRequest,
-		Timestamp: start,
-	}
-
-	if endpointRequest.Timeout == 0 {
-		endpointRequest.Timeout = 10 * time.Second
-	}
-	if endpointRequest.Status == 0 {
-		endpointRequest.Status = http.StatusOK
-	}
-	if endpointRequest.Method != "GET" && endpointRequest.Method != "POST" {
-		endpointRequest.Method = "GET"
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, endpointRequest.Timeout)
+	retryConfig := h.getRetryConfig(endpointRequest)
+	timeoutCtx, cancel := context.WithTimeout(ctx, retryConfig.Timeout)
 	defer cancel()
 
-	request, err := http.NewRequestWithContext(ctx, endpointRequest.Method, endpointRequest.URL, nil)
-	if err != nil {
-		endpointResponse.Error = fmt.Errorf("failed to create request: %w", err)
-		return endpointResponse
-	}
+	var response EndpointResponse
+	var lastError error
 
-	response, err := h.client.Do(request)
-	endpointResponse.Duration = time.Since(start)
-
-	if err != nil {
-		endpointResponse.Error = fmt.Errorf("request failed: %w", err)
-		return endpointResponse
-	}
-	defer response.Body.Close()
-
-	endpointResponse.Status = response.StatusCode
-	if response.StatusCode != endpointRequest.Status {
-		endpointResponse.Error = fmt.Errorf("unexpected status code: got %d, wanted %d",
-			response.StatusCode, endpointRequest.Status)
-	}
-
-	return endpointResponse
-}
-
-func (h *EndpointHandler) storeResponse(response EndpointResponse) error {
-	stored := StoredResponse{
-		URL:       response.Endpoint.URL,
-		Method:    response.Endpoint.Method,
-		Status:    response.Status,
-		Expected:  response.Endpoint.Status,
-		Timestamp: response.Timestamp,
-		Duration:  response.Duration,
-	}
-	if response.Error != nil {
-		stored.Error = response.Error.Error()
-	}
-
-	return h.db.Update(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(endpointBucket))
-
-		var responses []StoredResponse
-		data := b.Get([]byte(response.Endpoint.URL))
-		if data != nil {
-			if err := json.Unmarshal(data, &responses); err != nil {
-				return fmt.Errorf("failed to unmarshal existing responses: %w", err)
+	for attempt := 0; attempt <= retryConfig.Attempts; attempt++ {
+		if attempt > 0 {
+			if err := h.waitForRetry(timeoutCtx, attempt, retryConfig); err != nil {
+				return h.createTimeoutResponse(endpointRequest, attempt, lastError)
 			}
 		}
 
-		responses = append(responses, stored)
-		if len(responses) > h.histSize {
-			responses = responses[len(responses)-h.histSize:]
+		response = h.performRequest(timeoutCtx, endpointRequest)
+		if h.isSuccessfulResponse(response) {
+			break
 		}
+		lastError = response.Error
+	}
 
-		data, err := json.Marshal(responses)
-		if err != nil {
-			return fmt.Errorf("failed to marshal responses: %w", err)
-		}
+	if err := h.storeResponse(response); err != nil {
+		log.Printf("Failed to store response: %v", err)
+	}
 
-		return b.Put([]byte(response.Endpoint.URL), data)
-	})
+	return response
 }
 
 func (h *EndpointHandler) GetEndpointHistory(url string) ([]EndpointResponse, error) {
@@ -218,3 +166,116 @@ func (h *EndpointHandler) GetAllEndpoints() ([]string, error) {
 	return urls, err
 }
 
+func (h *EndpointHandler) isSuccessfulResponse(resp EndpointResponse) bool {
+	if resp.Status >= 400 {
+		return false
+	}
+	return resp.Status == resp.Endpoint.Status
+}
+
+func (h *EndpointHandler) createTimeoutResponse(req EndpointRequest, attempt int, lastError error) EndpointResponse {
+	response := EndpointResponse{
+		Endpoint:  req,
+		Status:    0,
+		Error:     fmt.Errorf("timeout reached after %d retries: %w", attempt, lastError),
+		Timestamp: time.Now(),
+	}
+
+	if err := h.storeResponse(response); err != nil {
+		log.Printf("Failed to store timeout response: %v", err)
+	}
+
+	return response
+}
+
+
+func (h *EndpointHandler) getRetryConfig(req EndpointRequest) RetryConfig {
+	return RetryConfig{
+		Attempts: utils.DefaultIfZero(req.RetryAttempts, 3),
+		Delay:    utils.DefaultIfZero(req.RetryDelay, time.Second),
+		Timeout:  utils.DefaultIfZero(req.Timeout, 10*time.Second),
+	}
+}
+
+func (h *EndpointHandler) waitForRetry(ctx context.Context, attempt int, config RetryConfig) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(config.Delay):
+		log.Printf("Retry attempt %d/%d", attempt, config.Attempts)
+		return nil
+	}
+}
+
+func (h *EndpointHandler) performRequest(ctx context.Context, endpointRequest EndpointRequest) EndpointResponse {
+	start := time.Now()
+	endpointResponse := EndpointResponse{
+		Endpoint:  endpointRequest,
+		Timestamp: start,
+	}
+
+	request, err := http.NewRequestWithContext(ctx, endpointRequest.Method, endpointRequest.URL, nil)
+	if err != nil {
+		endpointResponse.Error = fmt.Errorf("failed to create request: %w", err)
+		return endpointResponse
+	}
+
+	response, err := h.client.Do(request)
+	endpointResponse.Duration = time.Since(start)
+
+	if err != nil {
+		endpointResponse.Error = fmt.Errorf("request failed: %w", err)
+		return endpointResponse
+	}
+	defer response.Body.Close()
+
+	endpointResponse.Status = response.StatusCode
+
+	// Always set error for non-2xx status codes, even if expected
+	if response.StatusCode >= 400 {
+		endpointResponse.Error = fmt.Errorf("received error status code: %d", response.StatusCode)
+	} else if response.StatusCode != endpointRequest.Status {
+		endpointResponse.Error = fmt.Errorf("unexpected status code: got %d, wanted %d",
+			response.StatusCode, endpointRequest.Status)
+	}
+
+	return endpointResponse
+}
+
+func (h *EndpointHandler) storeResponse(response EndpointResponse) error {
+	stored := StoredResponse{
+		URL:       response.Endpoint.URL,
+		Method:    response.Endpoint.Method,
+		Status:    response.Status,
+		Expected:  response.Endpoint.Status,
+		Timestamp: response.Timestamp,
+		Duration:  response.Duration,
+	}
+	if response.Error != nil {
+		stored.Error = response.Error.Error()
+	}
+
+	return h.db.Update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(endpointBucket))
+
+		var responses []StoredResponse
+		data := b.Get([]byte(response.Endpoint.URL))
+		if data != nil {
+			if err := json.Unmarshal(data, &responses); err != nil {
+				return fmt.Errorf("failed to unmarshal existing responses: %w", err)
+			}
+		}
+
+		responses = append(responses, stored)
+		if len(responses) > h.histSize {
+			responses = responses[len(responses)-h.histSize:]
+		}
+
+		data, err := json.Marshal(responses)
+		if err != nil {
+			return fmt.Errorf("failed to marshal responses: %w", err)
+		}
+
+		return b.Put([]byte(response.Endpoint.URL), data)
+	})
+}

@@ -48,13 +48,13 @@ func NewAPI(handler *EndpointHandler) *API {
 	return api
 }
 
+func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	a.router.ServeHTTP(w, r)
+}
+
 func (a *API) setupRoutes() {
 	a.router.HandleFunc("/endpoints", a.handleGetEndpoints).Methods("GET")
 	a.router.HandleFunc("/endpoint/history", a.handleGetEndpointHistory).Methods("GET")
-}
-
-func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	a.router.ServeHTTP(w, r)
 }
 
 func (a *API) handleGetEndpoints(w http.ResponseWriter, r *http.Request) {
@@ -137,4 +137,3 @@ func (a *API) handleGetEndpointHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
-
