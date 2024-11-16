@@ -32,7 +32,9 @@ func TestEndpointHandler(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 		case "/content":
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("this is the expected text content"))
+			if _, err := w.Write([]byte("this is the expected text content")); err != nil {
+			    t.Fatalf("Failed to write response: %v", err)
+			}
 		}
 	}))
 	defer server.Close()
