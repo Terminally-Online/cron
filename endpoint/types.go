@@ -10,12 +10,13 @@ import (
 )
 
 type EndpointRequest struct {
-	URL           string
-	Method        string
-	Timeout       time.Duration
-	Status        int
-	RetryAttempts int
-	RetryDelay    time.Duration
+	URL             string
+	Method          string
+	Timeout         time.Duration
+	Status          int
+	RetryAttempts   int
+	RetryDelay      time.Duration
+	ExpectedContent string
 }
 
 type EndpointError struct {

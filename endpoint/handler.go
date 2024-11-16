@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"strings"
 	"terminally-online/cron/utils"
 	"time"
 
@@ -191,12 +193,27 @@ func (h *EndpointHandler) performRequest(ctx context.Context, endpointRequest En
 
 	endpointResponse.Status = response.StatusCode
 
-	// Always set error for non-2xx status codes, even if expected
+	// Check status code
 	if response.StatusCode >= 400 {
 		endpointResponse.Error = fmt.Errorf("received error status code: %d", response.StatusCode)
+		return endpointResponse
 	} else if response.StatusCode != endpointRequest.Status {
 		endpointResponse.Error = fmt.Errorf("unexpected status code: got %d, wanted %d",
 			response.StatusCode, endpointRequest.Status)
+		return endpointResponse
+	}
+
+	if endpointRequest.ExpectedContent != "" {
+		body, err := io.ReadAll(response.Body)
+		if err != nil {
+			endpointResponse.Error = fmt.Errorf("failed to read response body: %w", err)
+			return endpointResponse
+		}
+
+		if !strings.Contains(string(body), endpointRequest.ExpectedContent) {
+			endpointResponse.Error = fmt.Errorf("expected content not found: %s", endpointRequest.ExpectedContent)
+			return endpointResponse
+		}
 	}
 
 	return endpointResponse

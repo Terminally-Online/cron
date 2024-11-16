@@ -30,6 +30,9 @@ func TestEndpointHandler(t *testing.T) {
 		case "/timeout":
 			time.Sleep(2 * time.Second)
 			w.WriteHeader(http.StatusOK)
+		case "/content":
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("this is the expected text content"))
 		}
 	}))
 	defer server.Close()
@@ -83,6 +86,19 @@ func TestEndpointHandler(t *testing.T) {
 			},
 			wantErr:  true,
 			wantCode: 0,
+		},
+		{
+			name: "content verification",
+			request: EndpointRequest{
+				URL:             server.URL + "/content",
+				Method:          "GET",
+				Timeout:         time.Second,
+				Status:          http.StatusOK,
+				RetryAttempts:   1,
+				ExpectedContent: "expected text",
+			},
+			wantErr:  false,
+			wantCode: http.StatusOK,
 		},
 	}
 
