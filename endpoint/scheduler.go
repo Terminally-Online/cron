@@ -65,14 +65,4 @@ func (s *Scheduler) checkAll() {
 		wg.Wait()
 		close(results)
 	}()
-
-	for result := range results {
-		if err := s.handler.storeResponse(result); err != nil {
-			log.Printf("Failed to store response for %s: %v", result.Endpoint.URL, err)
-		}
-
-		if result.Error != nil {
-			log.Printf("Error checking %s: %v", result.Endpoint.URL, result.Error)
-		}
-	}
 }

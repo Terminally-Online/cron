@@ -49,6 +49,8 @@ func (h *EndpointHandler) Close() error {
 }
 
 func (h *EndpointHandler) Handle(ctx context.Context, endpointRequest EndpointRequest) EndpointResponse {
+	endpointRequest = getEndpointDefaults(endpointRequest)
+
 	retryConfig := h.getRetryConfig(endpointRequest)
 	timeoutCtx, cancel := context.WithTimeout(ctx, retryConfig.Timeout)
 	defer cancel()
@@ -68,6 +70,7 @@ func (h *EndpointHandler) Handle(ctx context.Context, endpointRequest EndpointRe
 			break
 		}
 		lastError = response.Error
+		log.Printf("Error checking %s: %v", response.Endpoint.URL, response.Error)
 	}
 
 	if err := h.storeResponse(response); err != nil {
@@ -149,6 +152,16 @@ func (h *EndpointHandler) createTimeoutResponse(req EndpointRequest, attempt int
 	}
 
 	return response
+}
+
+func getEndpointDefaults(req EndpointRequest) EndpointRequest {
+	req.Method = utils.DefaultIfZero(req.Method, "GET")
+	req.Timeout = utils.DefaultIfZero(req.Timeout, 10*time.Second)
+	req.Status = utils.DefaultIfZero(req.Status, http.StatusOK)
+	req.RetryAttempts = utils.DefaultIfZero(req.RetryAttempts, 3)
+	req.RetryDelay = utils.DefaultIfZero(req.RetryDelay, time.Second)
+
+	return req
 }
 
 func (h *EndpointHandler) getRetryConfig(req EndpointRequest) RetryConfig {
