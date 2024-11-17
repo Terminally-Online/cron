@@ -66,19 +66,19 @@ func (a *API) handleGetEndpointHistory(w http.ResponseWriter, r *http.Request) {
 	var successfulChecks int
 	var totalDuration time.Duration
 
-	for i, entry := range history {
+	for _, entry := range history {
 		var errorStr string
 		if entry.Error != nil {
 			errorStr = entry.Error.Error()
 		}
 
-		historyEntries[i] = HistoryEntry{
+		historyEntries = append(historyEntries, HistoryEntry{
 			Status:    entry.Status,
 			Expected:  entry.Endpoint.Status,
 			Error:     errorStr,
 			Timestamp: entry.Timestamp,
 			Duration:  entry.Duration,
-		}
+		})
 
 		if entry.Error == nil {
 			successfulChecks++

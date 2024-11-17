@@ -106,6 +106,7 @@ func (h *EndpointHandler) GetEndpointHistory(url string) ([]EndpointResponse, er
 				Status:    s.Status,
 				Timestamp: s.Timestamp,
 				Duration:  s.Duration,
+				Body:      s.Body,
 			}
 			if s.Error != "" {
 				responses[i].Error = fmt.Errorf("%s", s.Error)
@@ -204,9 +205,14 @@ func (h *EndpointHandler) performRequest(ctx context.Context, endpointRequest En
 	}
 	defer response.Body.Close()
 
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		endpointResponse.Error = fmt.Errorf("failed to read response body: %w", err)
+		return endpointResponse
+	}
+	endpointResponse.Body = string(body)
 	endpointResponse.Status = response.StatusCode
 
-	// Check status code
 	if response.StatusCode >= 400 {
 		endpointResponse.Error = fmt.Errorf("received error status code: %d", response.StatusCode)
 		return endpointResponse
@@ -217,13 +223,7 @@ func (h *EndpointHandler) performRequest(ctx context.Context, endpointRequest En
 	}
 
 	if endpointRequest.ExpectedContent != "" {
-		body, err := io.ReadAll(response.Body)
-		if err != nil {
-			endpointResponse.Error = fmt.Errorf("failed to read response body: %w", err)
-			return endpointResponse
-		}
-
-		if !strings.Contains(string(body), endpointRequest.ExpectedContent) {
+		if !strings.Contains(endpointResponse.Body, endpointRequest.ExpectedContent) {
 			endpointResponse.Error = fmt.Errorf("expected content not found: %s", endpointRequest.ExpectedContent)
 			return endpointResponse
 		}
@@ -240,6 +240,7 @@ func (h *EndpointHandler) storeResponse(response EndpointResponse) error {
 		Expected:  response.Endpoint.Status,
 		Timestamp: response.Timestamp,
 		Duration:  response.Duration,
+		Body:      response.Body,
 	}
 	if response.Error != nil {
 		stored.Error = response.Error.Error()

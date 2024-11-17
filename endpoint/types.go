@@ -31,6 +31,7 @@ type EndpointResponse struct {
 	Error     error
 	Timestamp time.Time
 	Duration  time.Duration
+	Body      string
 }
 
 type EndpointListResponse struct {
@@ -53,6 +54,7 @@ type EndpointResponseStored struct {
 	Error     string
 	Timestamp time.Time
 	Duration  time.Duration
+	Body      string
 }
 
 type HistoryResponse struct {
