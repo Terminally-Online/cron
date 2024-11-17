@@ -27,7 +27,7 @@ func main() {
 
 	scheduler := endpoint.NewScheduler(
 		handler,
-		1*time.Hour,
+		30*time.Minute,
 		endpoints,
 	)
 
