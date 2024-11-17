@@ -12,8 +12,9 @@ var DOMAIN_CONFIG = []DomainRequest{
 				ExpectedContent: "<title>Plug</title>",
 			},
 			{
-				URL:     "https://docs.onplug.io",
-				Timeout: 5 * time.Second,
+				URL:             "https://docs.onplug.io",
+				Timeout:         5 * time.Second,
+				ExpectedContent: "<title>Introduction | Plug Documentation</title>",
 			},
 		},
 	},
