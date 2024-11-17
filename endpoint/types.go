@@ -71,6 +71,16 @@ type HistoryEntry struct {
 	Duration  time.Duration `json:"duration"`
 }
 
+type DomainRequest struct {
+    Domain    string           `json:"domain"`
+    Endpoints []EndpointRequest `json:"endpoints"`
+}
+
+type DomainResponse struct {
+    Domain    string            `json:"domain"`
+    Endpoints []HistoryResponse `json:"endpoints"`
+}
+
 // Configuration types
 type RetryConfig struct {
 	Attempts int

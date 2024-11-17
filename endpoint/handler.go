@@ -133,6 +133,23 @@ func (h *EndpointHandler) GetAllEndpoints() ([]string, error) {
 	return urls, err
 }
 
+func (h *EndpointHandler) GetDomainEndpoints(domain string) ([]string, error) {
+    var endpoints []string
+
+    err := h.db.View(func(tx *bbolt.Tx) error {
+        b := tx.Bucket([]byte(endpointBucket))
+        return b.ForEach(func(k, v []byte) error {
+            url := string(k)
+            if strings.Contains(url, domain) {
+                endpoints = append(endpoints, url)
+            }
+            return nil
+        })
+    })
+
+    return endpoints, err
+}
+
 func (h *EndpointHandler) isSuccessfulResponse(resp EndpointResponse) bool {
 	if resp.Status >= 400 {
 		return false
@@ -157,7 +174,7 @@ func (h *EndpointHandler) createTimeoutResponse(req EndpointRequest, attempt int
 
 func getEndpointDefaults(req EndpointRequest) EndpointRequest {
 	req.Method = utils.DefaultIfZero(req.Method, "GET")
-	req.Timeout = utils.DefaultIfZero(req.Timeout, 10*time.Second)
+	req.Timeout = utils.DefaultIfZero(req.Timeout, 5*time.Second)
 	req.Status = utils.DefaultIfZero(req.Status, http.StatusOK)
 	req.RetryAttempts = utils.DefaultIfZero(req.RetryAttempts, 3)
 	req.RetryDelay = utils.DefaultIfZero(req.RetryDelay, time.Second)
@@ -169,7 +186,7 @@ func (h *EndpointHandler) getRetryConfig(req EndpointRequest) RetryConfig {
 	return RetryConfig{
 		Attempts: utils.DefaultIfZero(req.RetryAttempts, 3),
 		Delay:    utils.DefaultIfZero(req.RetryDelay, time.Second),
-		Timeout:  utils.DefaultIfZero(req.Timeout, 10*time.Second),
+		Timeout:  utils.DefaultIfZero(req.Timeout, 5*time.Second),
 	}
 }
 

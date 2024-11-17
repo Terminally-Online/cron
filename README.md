@@ -99,6 +99,5 @@ Response:
 
 -   [ ] Add metrics collection (Prometheus)
 -   [ ] Implement alerting for consecutive failures
--   [ ] Add retry logic for failed checks
 -   [ ] Support for different intervals per endpoint
 -   [ ] Add webhook notifications

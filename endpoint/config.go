@@ -2,18 +2,19 @@ package endpoint
 
 import "time"
 
-var ENDPOINT_CONFIG = []EndpointRequest{
+var DOMAIN_CONFIG = []DomainRequest{
 	{
-		URL:           "https://onplug.io",
-		Timeout:       5 * time.Second,
-		RetryAttempts: 3,
-		RetryDelay:    1 * time.Second,
-		ExpectedContent: "<title>Plug</title>",
-	},
-	{
-		URL:           "https://docs.onplug.io",
-		Timeout:       5 * time.Second,
-		RetryAttempts: 3,
-		RetryDelay:    1 * time.Second,
+		Domain: "plug",
+		Endpoints: []EndpointRequest{
+			{
+				URL:             "https://onplug.io",
+				Timeout:         5 * time.Second,
+				ExpectedContent: "<title>Plug</title>",
+			},
+			{
+				URL:     "https://docs.onplug.io",
+				Timeout: 5 * time.Second,
+			},
+		},
 	},
 }

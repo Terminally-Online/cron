@@ -12,50 +12,54 @@ import (
 )
 
 func main() {
-	handler, err := endpoint.NewEndpointHandler("endpoints.db", 48)
-	if err != nil {
-		log.Fatalf("Failed to create endpoint handler: %v", err)
-	}
-	defer handler.Close()
+    handler, err := endpoint.NewEndpointHandler("endpoints.db", 48)
+    if err != nil {
+        log.Fatalf("Failed to create endpoint handler: %v", err)
+    }
+    defer handler.Close()
 
-	api := endpoint.NewAPI(handler)
+    api := endpoint.NewAPI(handler)
 
-	scheduler := endpoint.NewScheduler(
-		handler,
-		1*time.Minute,
-		endpoint.ENDPOINT_CONFIG,
-	)
+    var endpoints []endpoint.EndpointRequest
+    for _, domain := range endpoint.DOMAIN_CONFIG {
+        endpoints = append(endpoints, domain.Endpoints...)
+    }
 
-	scheduler.Start()
+    scheduler := endpoint.NewScheduler(
+        handler,
+        1*time.Hour,
+        endpoints,
+    )
 
-	srv := &http.Server{
-		Handler:      api,
-		Addr:         ":8080",
-		WriteTimeout: 15 * time.Second,
-		ReadTimeout:  15 * time.Second,
-	}
+    scheduler.Start()
 
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+    srv := &http.Server{
+        Handler:      api,
+        Addr:         ":8080",
+        WriteTimeout: 15 * time.Second,
+        ReadTimeout:  15 * time.Second,
+    }
 
-	go func() {
-		log.Printf("Starting server on :8080")
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Error starting server: %v", err)
-		}
-	}()
+    stop := make(chan os.Signal, 1)
+    signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
-	<-stop
-	log.Println("Shutting down...")
+    go func() {
+        log.Printf("Starting server on :8080")
+        if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+            log.Fatalf("Error starting server: %v", err)
+        }
+    }()
 
-	scheduler.Stop()
+    <-stop
+    log.Println("Shutting down...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := srv.Shutdown(ctx); err != nil {
-		log.Printf("Error shutting down server: %v", err)
-	}
+    scheduler.Stop()
 
-	log.Println("Shutdown complete")
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+    if err := srv.Shutdown(ctx); err != nil {
+        log.Printf("Error shutting down server: %v", err)
+    }
+
+    log.Println("Shutdown complete")
 }
-
